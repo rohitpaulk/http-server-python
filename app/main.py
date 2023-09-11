@@ -87,7 +87,9 @@ def main():
         conn.sendall(bytes(response))
     elif request.path == "/user-agent":
         response = HTTPResponse(
-            200, body=request.headers["User-Agent"].encode(), headers={"Content-Type": "text/plain"}
+            200,
+            body=request.headers["User-Agent"].encode(),
+            headers={"Content-Type": "text/plain"},
         )
         conn.sendall(bytes(response))
     else:
