@@ -38,22 +38,35 @@ class HTTPRequest:
         self.raw_contents = raw_contents
 
     @property
+    def headers(self):
+        return dict(
+            [item.decode("utf-8") for item in line.split(b": ")]
+            for line in self.headers_section.split(b"\r\n")
+            if line
+        )
+
+    @property
     def method(self):
-        return self.status_line().split(b" ")[0].decode("utf-8")
+        return self.status_line.split(b" ")[0].decode("utf-8")
 
     @property
     def path(self):
-        return self.status_line().split(b" ")[1].decode("utf-8")
+        return self.status_line.split(b" ")[1].decode("utf-8")
 
     @property
     def protocol(self):
-        return self.status_line().split(b" ")[2].decode("utf-8")
+        return self.status_line.split(b" ")[2].decode("utf-8")
+
+    @property
+    def status_line(self):
+        return self.raw_contents.split(b"\r\n")[0]
+
+    @property
+    def headers_section(self):
+        return b"\r\n".join(self.raw_contents.split(b"\r\n")[1:])
 
     def __repr__(self):
         return f"<HTTPRequest {self.method} {self.path}>"
-
-    def status_line(self):
-        return self.raw_contents.split(b"\r\n")[0]
 
 
 def main():
@@ -70,6 +83,11 @@ def main():
         value = request.path.split("/echo/")[1]
         response = HTTPResponse(
             200, body=value.encode("utf-8"), headers={"Content-Type": "text/plain"}
+        )
+        conn.sendall(bytes(response))
+    elif request.path == "/user-agent":
+        response = HTTPResponse(
+            200, body=request.headers["User-Agent"].encode(), headers={"Content-Type": "text/plain"}
         )
         conn.sendall(bytes(response))
     else:
