@@ -1,6 +1,36 @@
 import socket
 
 
+class HTTPResponse:
+    def __init__(self, status_code: int, body: bytes = None, headers: dict = None):
+        self.status_code = status_code
+        self.body = body
+        self.headers = headers or {}
+
+    @property
+    def status_line(self):
+        return f"HTTP/1.1 {self.status_code}"
+
+    @property
+    def headers_section(self):
+        return "\r\n".join(
+            f"{k}: {v}"
+            for k, v in {
+                "Content-Length": len(self.body) if self.body else 0,
+                **self.headers,
+            }.items()
+        )
+
+    def __bytes__(self):
+        return (
+            self.status_line.encode("utf-8")
+            + b"\r\n"
+            + self.headers_section.encode("utf-8")
+            + b"\r\n\r\n"
+            + (self.body or b"")
+        )
+
+
 class HTTPRequest:
     raw_contents: bytes
 
@@ -35,9 +65,15 @@ def main():
     print(request)
 
     if request.path == "/":
-        conn.sendall(b"HTTP/1.1 200 OK\r\n\r\n")
+        conn.sendall(bytes(HTTPResponse(200)))
+    elif request.path.startswith("/echo"):
+        value = request.path.split("/echo/")[1]
+        response = HTTPResponse(
+            200, body=value.encode("utf-8"), headers={"Content-Type": "text/plain"}
+        )
+        conn.sendall(bytes(response))
     else:
-        conn.sendall(b"HTTP/1.1 404 NOT FOUND\r\n\r\n")
+        conn.sendall(bytes(HTTPResponse(404)))
 
 
 if __name__ == "__main__":
