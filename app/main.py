@@ -1,4 +1,5 @@
 import socket
+import threading
 
 
 class HTTPResponse:
@@ -69,6 +70,29 @@ class HTTPRequest:
         return f"<HTTPRequest {self.method} {self.path}>"
 
 
+def handle_connection(conn):
+    request = HTTPRequest(conn.recv(1024))
+    print(request)
+
+    if request.path == "/":
+        conn.sendall(bytes(HTTPResponse(200)))
+    elif request.path.startswith("/echo"):
+        value = request.path.split("/echo/")[1]
+        response = HTTPResponse(
+            200, body=value.encode("utf-8"), headers={"Content-Type": "text/plain"}
+        )
+        conn.sendall(bytes(response))
+    elif request.path == "/user-agent":
+        response = HTTPResponse(
+            200,
+            body=request.headers["User-Agent"].encode(),
+            headers={"Content-Type": "text/plain"},
+        )
+        conn.sendall(bytes(response))
+    else:
+        conn.sendall(bytes(HTTPResponse(404)))
+
+
 def main():
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
 
@@ -76,26 +100,8 @@ def main():
         conn, addr = server_socket.accept()  # wait for client
         print("Client connected", addr)
 
-        request = HTTPRequest(conn.recv(1024))
-        print(request)
-
-        if request.path == "/":
-            conn.sendall(bytes(HTTPResponse(200)))
-        elif request.path.startswith("/echo"):
-            value = request.path.split("/echo/")[1]
-            response = HTTPResponse(
-                200, body=value.encode("utf-8"), headers={"Content-Type": "text/plain"}
-            )
-            conn.sendall(bytes(response))
-        elif request.path == "/user-agent":
-            response = HTTPResponse(
-                200,
-                body=request.headers["User-Agent"].encode(),
-                headers={"Content-Type": "text/plain"},
-            )
-            conn.sendall(bytes(response))
-        else:
-            conn.sendall(bytes(HTTPResponse(404)))
+        thread = threading.Thread(target=handle_connection, args=(conn,))
+        thread.start()
 
 
 if __name__ == "__main__":
