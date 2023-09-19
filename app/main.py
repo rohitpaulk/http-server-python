@@ -1,3 +1,5 @@
+import argparse
+import os
 import socket
 import threading
 
@@ -70,7 +72,7 @@ class HTTPRequest:
         return f"<HTTPRequest {self.method} {self.path}>"
 
 
-def handle_connection(conn):
+def handle_connection(conn, data_directory):
     request = HTTPRequest(conn.recv(1024))
     print(request)
 
@@ -89,18 +91,37 @@ def handle_connection(conn):
             headers={"Content-Type": "text/plain"},
         )
         conn.sendall(bytes(response))
+    elif request.path.startswith("/files/"):
+        filename = request.path.split("/files/")[1]
+        file_path = os.path.join(data_directory, filename)
+
+        if os.path.isfile(file_path):
+            response = HTTPResponse(
+                200,
+                body=open(file_path, "rb").read(),
+                headers={"Content-Type": "application/octet-stream"},
+            )
+            conn.sendall(bytes(response))
+        else:
+            conn.sendall(bytes(HTTPResponse(404)))
+
     else:
         conn.sendall(bytes(HTTPResponse(404)))
 
 
 def main():
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument("--directory", default=os.getcwd())
+    args = arg_parser.parse_args()
+    data_directory = args.directory
+
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
 
     while True:
         conn, addr = server_socket.accept()  # wait for client
         print("Client connected", addr)
 
-        thread = threading.Thread(target=handle_connection, args=(conn,))
+        thread = threading.Thread(target=handle_connection, args=(conn, data_directory))
         thread.start()
 
 
