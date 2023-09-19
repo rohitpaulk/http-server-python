@@ -68,6 +68,10 @@ class HTTPRequest:
     def headers_section(self):
         return b"\r\n".join(self.raw_contents.split(b"\r\n")[1:])
 
+    @property
+    def body(self):
+        return self.raw_contents.split(b"\r\n\r\n")[1]
+
     def __repr__(self):
         return f"<HTTPRequest {self.method} {self.path}>"
 
@@ -92,16 +96,27 @@ def handle_connection(conn, data_directory):
         )
         conn.sendall(bytes(response))
     elif request.path.startswith("/files/"):
-        filename = request.path.split("/files/")[1]
-        file_path = os.path.join(data_directory, filename)
+        if request.method == "GET":
+            filename = request.path.split("/files/")[1]
+            file_path = os.path.join(data_directory, filename)
 
-        if os.path.isfile(file_path):
-            response = HTTPResponse(
-                200,
-                body=open(file_path, "rb").read(),
-                headers={"Content-Type": "application/octet-stream"},
-            )
-            conn.sendall(bytes(response))
+            if os.path.isfile(file_path):
+                response = HTTPResponse(
+                    200,
+                    body=open(file_path, "rb").read(),
+                    headers={"Content-Type": "application/octet-stream"},
+                )
+                conn.sendall(bytes(response))
+            else:
+                conn.sendall(bytes(HTTPResponse(404)))
+        elif request.method == "POST":
+            filename = request.path.split("/files/")[1]
+            file_path = os.path.join(data_directory, filename)
+
+            with open(file_path, "wb") as f:
+                f.write(request.body)
+
+            conn.sendall(bytes(HTTPResponse(201)))
         else:
             conn.sendall(bytes(HTTPResponse(404)))
 
